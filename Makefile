@@ -36,7 +36,6 @@ TEST_DIR := test
 TESTS := $(wildcard $(TEST_DIR)/*.txt)
 
 check: $(TARGET) $(TESTS)
-	@echo "Running tests..."
 	@for test in $(TESTS); do \
 		test_name=$$(basename "$$test" .txt); \
 		expected="$(TEST_DIR)/$$test_name.expected"; \
@@ -50,5 +49,4 @@ check: $(TARGET) $(TESTS)
 		fi; \
 		rm -f "$$actual"; \
 	done
-	@echo "All tests passed!"
 .PHONY: all clean check
