@@ -1,52 +1,47 @@
-# Получаем значения из config.json
 NAME := $(shell jq -r .name config.json)
 VERSION := $(shell jq -r .version config.json)
 
-# Директории
 SRC_DIR := src
 BUILD_DIR := build
+TEST_DIR := test
 SRC := $(SRC_DIR)/wordcount.c
 TARGET := $(BUILD_DIR)/$(NAME)
 
-# Компилятор и флаги
 CC := gcc
 CFLAGS := -Wall -Wextra
 DEFINES := -DNAME=\"$(NAME)\" -DVERSION=\"$(VERSION)\"
 
-# Основная цель
+TESTS := $(wildcard $(TEST_DIR)/*.txt)
+TEST_RESULTS := $(TESTS:.txt=.result)
+
 all: $(TARGET)
 
-# Сборка целевого приложения
 $(TARGET): $(SRC) config.json | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(DEFINES) -o $@ $<
 
-# Создание директории build если её нет
 $(BUILD_DIR):
 	mkdir -p $@
 
-# Очистка артефактов сборки
+$(TEST_RESULTS): %.result: %.txt $(TARGET)
+	@test_name=$$(basename "$<" .txt); \
+	expected="$(TEST_DIR)/$$test_name.expected"; \
+	actual="$(TEST_DIR)/$$test_name.actual"; \
+	./$(TARGET) < "$<" > "$$actual" 2>&1; \
+	if ! diff -u "$$expected" "$$actual" > /dev/null 2>&1; then \
+		echo "Test $$test_name failed:"; \
+		diff -u "$$expected" "$$actual" || true; \
+		rm -f "$$actual"; \
+		exit 1; \
+	fi; \
+	rm -f "$$actual"; \
+	touch $@
+
+check: $(TEST_RESULTS)
+
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f $(TEST_RESULTS)
 
-# Отслеживание изменений в config.json
 $(SRC): config.json
 
-# Тестирование
-TEST_DIR := test
-TESTS := $(wildcard $(TEST_DIR)/*.txt)
-
-check: $(TARGET) $(TESTS)
-	@for test in $(TESTS); do \
-		test_name=$$(basename "$$test" .txt); \
-		expected="$(TEST_DIR)/$$test_name.expected"; \
-		actual="$(TEST_DIR)/$$test_name.actual"; \
-		./$(TARGET) < "$$test" > "$$actual" 2>&1; \
-		if ! diff -u "$$expected" "$$actual" > /dev/null 2>&1; then \
-			echo "Test $$test_name failed:"; \
-			diff -u "$$expected" "$$actual" || true; \
-			rm -f "$$actual"; \
-			exit 1; \
-		fi; \
-		rm -f "$$actual"; \
-	done
 .PHONY: all clean check
